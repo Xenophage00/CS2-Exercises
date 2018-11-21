@@ -1,0 +1,267 @@
+//James Morrison
+//11/19/18
+
+// EXERCISE 31.5 (3 separate classes)
+// (Send loan information in an object) Revise Exercise 31.1 for the client to
+// send a loan object that contains annual interest rate (rate), number of years(years), and loan
+// amount (amount) and for the server to send the monthly payment and total payment.
+
+//SERVER for 31.5
+package ch31;
+import java.io.*;
+import java.net.*;
+import java.util.Date;
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.scene.Scene;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextArea;
+import javafx.stage.Stage;
+
+public class Project315 extends Application {
+  @Override // Override the start method in the Application class
+  public void start(Stage primaryStage) {
+
+    // Text area for displaying contents                 // T E X T
+    TextArea ta = new TextArea();                        // A R E A
+    // Create a scene and place it in the stage
+    Scene scene = new Scene(new ScrollPane(ta), 450, 200);// Create scene
+    primaryStage.setTitle("Loan Calculator Server");      // Set the stage title
+    primaryStage.setScene(scene);                         // Place the scene in the stage
+    primaryStage.show();                                  // Display the stage
+    
+    new Thread( () -> {
+      try {
+        // Create a server socket for network connection
+    	int socketNum = 8005;
+        ServerSocket serverSocket = new ServerSocket(socketNum);
+        Platform.runLater(() ->
+          ta.appendText("Server started at " + new Date() + '\n' + "On port " + socketNum + '\n'));
+  
+        // Listen for a connection request
+        Socket socket = serverSocket.accept();
+  
+        // Create data input and output streams
+        ObjectInputStream inputFromClient = new ObjectInputStream(
+          socket.getInputStream());
+        DataOutputStream outputToClient = new DataOutputStream(
+          socket.getOutputStream());
+  
+        while (true) {
+          // Receive loan from the client
+          Loan loan1;
+		try {
+			loan1 = (Loan) inputFromClient.readObject();
+  
+          // Compute monthly and total pay
+          double monthPay = ((loan1.getRate()/12)*(loan1.getAmount()));  // This is how much needs to be payed each month
+          double totalPay = ((loan1.getYears()*loan1.getRate()*(loan1.getAmount()))); // How much will have been paid after a number of years
+  
+          // Send Data back to the client
+          outputToClient.writeUTF("With the given loan amount, the monthly payment is $" + Double.toString(monthPay)+ ", "+ '\n' + 
+          "and the total payment is $" + Double.toString(totalPay)+ ". ");
+          
+          Platform.runLater(() -> {
+        	ta.appendText("Loan's amount received from client: " + loan1.getAmount() + '\n');
+           	ta.appendText("Loan's annual interest rate received from client: " + loan1.getRate() + '\n');
+           	ta.appendText("Loan's number of years received from client: " + loan1.getYears() + '\n');
+           	ta.appendText("Monthly Payment is: " + monthPay + '\n');
+           	ta.appendText("Total Payment is: " + totalPay + '\n');
+          });
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		}
+      }
+      catch(IOException ex) {
+        ex.printStackTrace();
+      }
+    }).start();
+  }
+
+  public static void main(String[] args) {
+    launch(args);
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+//---------------------------------------------------------------------------------------------------------------------------
+//CLIENT
+package ch31;
+// Client for Program 31.5
+import java.io.*;
+import java.net.*;
+
+import javafx.application.Application;
+import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
+import javafx.geometry.Insets;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
+import javafx.stage.Stage;
+
+public class Project315Client extends Application {
+  // IO streams
+  ObjectOutputStream toServer = null;
+  DataInputStream fromServer = null;
+
+  @Override // Override the start method in the Application class
+  public void start(Stage primaryStage) {
+	 
+	//Create a pane for holding inputs at the top of the window //
+    GridPane paneForTextField = new GridPane();                     // I N P U T
+    paneForTextField.setPadding(new Insets(5, 5, 5, 5));            // P A N E
+    paneForTextField.setStyle("-fx-border-color: green");           //
+    //Add the text above the TextField boxes
+    paneForTextField.add(new Label("Annual interest rate (percent): "),0,0);          // 
+    paneForTextField.add(new Label("Number of years the loan will be paid: "),1,0);   // L A B E L S
+    paneForTextField.add(new Label("Loan's principal: "),2,0);                        // 
+    //Create the different Text Fields
+    TextField tf = new TextField();         //
+    TextField tf2 = new TextField();        // T E X T
+    TextField tf3 = new TextField();        // F I E L D S
+    paneForTextField.add(tf, 0, 2);         //
+    paneForTextField.add(tf2, 1, 2);        //
+    paneForTextField.add(tf3, 2, 2);        //
+    //Creates the button
+    Button btAdd = new Button("Enter Data");      //
+    paneForTextField.add(btAdd, 3, 3);            // B U T T O N
+    HandlerClass handler1 = new HandlerClass();   //
+    btAdd.setOnAction(handler1);                  //
+    //Creates the other pane
+    BorderPane mainPane = new BorderPane();         //
+    // Text area to display contents                // O U T P U T
+    TextArea ta = new TextArea();                   // P A N E
+    ta.appendText("Output Stream: " + "\n"); //
+    mainPane.setCenter(new ScrollPane(ta));         //
+    mainPane.setTop(paneForTextField);              //
+    // Create a scene and place it in the stage              
+    Scene scene = new Scene(mainPane, 700, 400);                      //
+    primaryStage.setTitle("Client"); // Set the stage title           // S T A G E 
+    primaryStage.setScene(scene); // Place the scene in the stage     //   A N D 
+    primaryStage.show(); // Display the stage                         // S E T U P
+    
+    btAdd.setOnAction(e -> {
+      try {
+        // Get the radius from the text field
+        double rate = Double.parseDouble(tf.getText().trim())/100;
+        double years = Double.parseDouble(tf2.getText().trim());
+        double amount = Double.parseDouble(tf3.getText().trim());
+        //Create a loan object with the taken values
+        Loan loan1 = new Loan();
+        loan1.setAmount(amount);
+        loan1.setRate(rate);
+        loan1.setYears(years);       
+        //Print out information
+        ta.appendText("Loan's amount: $" + loan1.getAmount() + '\n');
+       	ta.appendText("Loan's annual interest rate: " + loan1.getRate()*100 +"%"+ '\n');
+       	ta.appendText("Loan's number of years: " + loan1.getYears() + '\n');
+       	ta.appendText("Recieved from server: " + '\n');
+        // Send the Loan to the server
+        toServer.writeObject(loan1);
+        toServer.flush();
+  
+        // Get output from the server
+        String stringFromServer= fromServer.readUTF();
+        // Display to the text area
+        ta.appendText(stringFromServer);
+        ta.appendText("\n");
+        ta.appendText("\n");
+      }
+      catch (IOException ex) {
+        System.err.println(ex);
+      }
+    });
+  
+    try {
+      // Create a socket to connect to the server
+      Socket socket = new Socket("localhost", 8005);
+      // Socket socket = new Socket("130.254.204.36", 0);
+      // Socket socket = new Socket("drake.Armstrong.edu", 8000);
+
+      // Create an input stream to receive data from the server
+      fromServer = new DataInputStream(socket.getInputStream());
+
+      // Create an output stream to send data to the server
+      toServer = new ObjectOutputStream(socket.getOutputStream());
+    }
+    catch (IOException ex) {
+      ta.appendText(ex.toString() + '\n');
+    }
+  }
+
+  /**
+   * The main method is only needed for the IDE with limited
+   * JavaFX support. Not needed for running from the command line.
+   */
+  public static void main(String[] args) {
+    launch(args);
+  }
+}
+
+class HandlerClass implements EventHandler<ActionEvent> {
+	  @Override
+	  public void handle(ActionEvent e) {
+	    
+	  }
+	}
+
+
+
+
+
+
+
+
+
+
+
+//---------------------------------------------------------------------------------------------------------------------------
+//LOAN CLASS
+//This class defines the Loan Object to be used with program 31.5
+package ch31;
+import java.io.Serializable;
+
+public class Loan implements Serializable {
+	// Declare variables
+    private double amount;
+    private double rate;
+    private double years;
+    // Create getters
+    public double getAmount() {
+        return this.amount;
+    }
+    public double getRate() {
+        return this.rate;
+    }
+    public double getYears() {
+        return this.years;
+    }
+    // Create setters
+    public void setAmount(double num) {
+        this.amount = num;
+    }
+    public void setRate(double num) {
+        this.rate = num;
+    }  
+    public void setYears(double num) {
+        this.years = num;
+    }
+}
